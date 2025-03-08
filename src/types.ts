@@ -211,3 +211,20 @@ export type AppClient = {
    */
   requirePkce: boolean;
 };
+
+export type UserInfo = {
+  name: string | null;
+  givenName: string | null;
+  familyName: string | null;
+  birthDate: Date | null;
+  address: {
+    locality: string | null;
+    region: string | null;
+    postalCode: string | null;
+    country: string | null;
+  } | null;
+  locale: string | null;
+  createdAt: Date | null;
+  modifiedAt: Date | null;
+  zoneInfo: string | null;
+}

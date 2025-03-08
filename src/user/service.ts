@@ -1,12 +1,13 @@
-import { UnprocessableContent } from '@curveball/http-errors';
+import { BadRequest, NotFound, UnprocessableContent } from '@curveball/http-errors';
 import * as bcrypt from 'bcrypt';
 import db from '../database.ts';
+
+import { UserInfoRecord } from 'knex/types/tables.js';
 import { UserEventLogger } from '../log/types.ts';
 import * as loginActivityService from '../login/login-activity/service.ts';
 import { getSetting } from '../server-settings.ts';
-import { User } from '../types.ts';
+import { User, UserInfo } from '../types.ts';
 import { IncorrectPassword, TooManyLoginAttemptsError } from './error.ts';
-
 export async function createPassword(user: User, password: string): Promise<void> {
 
   assertValidPassword(password);
@@ -117,3 +118,63 @@ export async function validateUserCredentials(user: User, password: string, log:
   return true;
 }
 
+/**
+ * @description - Given a principal User, uses the principal id to find the UserInfo record for a user.
+ * @param user - The principal User to find the UserInfo record for.
+ * @returns The UserInfo record for the user.
+ * @throws NotFound - If the UserInfo record is not found.
+ */
+export async function findUserInfoByUser(user: User): Promise<UserInfo> {
+
+  const result = await db('user_info')
+      .select()
+      .where({principal_id: user.id})
+      .first();
+
+  if (!result) throw new NotFound(`UserInfo for user "${user.id}" not found.`);
+
+  return recordToModel(user, result);
+}
+
+/**
+ * @description - Given a principal User, uses the principal id to find the Principal user and update the UserInfo record for a user.
+ * @param user - The principal User to update the UserInfo record for.
+ * @param userInfo - new UserInfo object to update the UserInfo record with.
+ * @returns The updated UserInfo record.
+ * @throws BadRequest - If the UserInfo record is not updated.
+ */
+export async function updateUserInfo(user: User, userInfo: UserInfo): Promise<void> {
+  
+  const result = await db('user_info')
+    .where({principal_id: user.id})
+    .update(
+      {
+        name: userInfo.name,
+        locale: userInfo.locale,
+        given_name: userInfo.givenName,
+        family_name: userInfo.familyName,
+        birthdate: userInfo.birthDate,
+        address: userInfo.address ? JSON.stringify(userInfo.address) : null,
+        zoneinfo: userInfo.zoneInfo,
+      }
+    );
+
+  if (!result) throw new BadRequest(`UserInfo for user "${user.id}" was not updated.`);
+
+}
+
+
+export async function recordToModel(user: User, record: UserInfoRecord): Promise<UserInfo> {  
+
+  return {
+    createdAt: record.created_at ? new Date(+record.created_at) : null,
+    modifiedAt: record.modified_at ? new Date(+record.modified_at) : null,
+    name: record.name || null,
+    locale: record.locale || null,
+    givenName: record.given_name || null,
+    familyName: record.family_name || null,
+    birthDate: record.birthdate || null,
+    address: record.address ? JSON.parse(record.address) : null,
+    zoneInfo: record.zoneinfo || null,
+  };
+}
